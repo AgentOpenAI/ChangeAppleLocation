@@ -1,0 +1,16 @@
+{
+  "name": "change-apple-location-scripts",
+  "version": "1.0.0",
+  "description": "iOS Apple WLOC Location Spoofing Agent Scripts - Build Tools",
+  "scripts": {
+    "build:minify": "esbuild src/wloc.js --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=dist/wloc.js && esbuild src/wloc-settings.js --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=dist/wloc-settings.js",
+    "build:dev": "esbuild src/wloc.js --bundle --format=iife --platform=browser --target=es2020 --outfile=dist/wloc.dev.js && esbuild src/wloc-settings.js --bundle --format=iife --platform=browser --target=es2020 --outfile=dist/wloc-settings.dev.js",
+    "build": "npm run build:minify && npm run build:dev"
+  },
+  "dependencies": {
+    "pako": "^2.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
