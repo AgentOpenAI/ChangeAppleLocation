@@ -8,6 +8,44 @@
 
 ---
 
+## 🛠️ 底层原理与架构设计
+
+本项目实现修改 iOS 网络定位（WLOC）的机制非常巧妙。它的核心逻辑由 **本地代理 MITM** 与 **Cloudflare Worker** 两个部分完美协作完成。
+
+### 1. 苹果网络定位 (WLOC) 机制
+当 iOS 设备的 GPS 信号不佳（如在室内、高架下）或系统试图通过基站快速定位时，会向苹果定位服务器 `gs-loc.apple.com/clls/wloc` 发送定位请求。
+* **数据格式**：该请求和响应均使用 Google Protobuf 二进制序列化协议。
+* **请求内容**：包含设备探测到的周围 Wi-Fi 路由器的 MAC 地址、蜂窝基站 ID 等信息。
+* **响应内容**：苹果服务器计算出的地理坐标（经纬度、精度范围），以经过 **Gzip 压缩** 的 Protobuf 格式返回。
+
+### 2. 代理中间人 (MITM) 解密与二进制篡改
+当代理工具（如 Surge、Quantumult X 等）启用了 `gs-loc.apple.com` 的 MITM 解密并加载本模块后：
+1. **脚本捕获**：设备发起的 `clls/wloc` 请求在收到响应时会被 `wloc.js` 脚本拦截。
+2. **解压数据**：脚本使用内存中的 `pako` 库将响应体的 Gzip 数据解压为原始二进制 Protobuf 流。
+3. **精密 Patch**：
+   - 脚本并不会反序列化整个 Protobuf 结构，而是通过一个专用的二进制扫描器寻找包含基站纬度（Latitude）和经度（Longitude）的数据字段。
+   - 在 WLOC 的数据结构中，坐标值是以 $10^8$ 倍的缩放值作为 Varint（可变长整型）存储的。
+   - 脚本直接用我们在本地保存好的虚拟坐标，替换二进制流中所有的坐标数据，并动态修正字段长度。
+4. **回放篡改响应**：最后将篡改好的二进制流交付给 iOS 系统的定位守护进程（`locationd`），从而使系统和所有 App 误以为设备正处在这个修改后的虚拟位置。
+
+### 3. Cloudflare Worker 的精妙设计（无状态/零存储）
+在这个项目中，自建的 Cloudflare Worker 扮演了两个不可或缺的角色：
+
+#### A. 零存储的“本地化”选点控制台
+* 传统的定位修改需要云端数据库或第三方服务来存储用户选定的经纬度。
+* 本项目将 Worker 作为一个纯静态的 HTML 地图选点页面。当您在网页（`https://您的worker/`）上选好点并点击 **“储存到设备”** 时，页面会向 `/wloc-settings/save?lon=xxx&lat=xxx` 发起请求。
+* **本地拦截**：由于您的代理工具对该域名启用了 MITM 拦截，此请求在发出手机前就会被 `wloc-settings.js` 脚本捕获。
+* **数据本地落盘**：脚本将坐标参数直接存入您代理工具的本地持久化存储（`$persistentStore` 或 `$prefs`）中，**整个过程没有任何数据流向云端**，实现了绝对的个人隐私保护与零服务器存储开销。
+
+#### B. 快捷指令的“智能中转与火星坐标偏转 API”
+当您使用 iOS 快捷指令（直接分享地图卡片一键设置定位）时：
+* 快捷指令在本地难以解析如高德地图分享出来的 `amap.com/xxx` 短链接。
+* 快捷指令需要将链接发送到 Worker 的 `/api/parse` 接口。
+* **短链追踪**：Worker 自动追踪 302 重定向并提取出真实的地图长链接和坐标信息。
+* **火星坐标系（GCJ-02）逆偏转换算**：国内的苹果地图、高德地图使用的都是 GCJ-02 偏移坐标，而苹果 WLOC 机制底层需要标准的 WGS-84（地球坐标系）坐标。直接使用会导致数百米的偏差。Worker 会自动进行高精度的 GCJ-02 -> WGS-84 数学纠偏，将标准坐标返回给快捷指令，确保定位准确无误。
+
+---
+
 ## 订阅地址
 
 **Surge:**
@@ -97,20 +135,7 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 
 </details>
 
-<details>
-<summary><b>工作原理</b></summary>
-
-```
-选点页面 → fetch gs-loc.apple.com/wloc-settings/save?lon=x&lat=y
-         → 代理模块拦截 → wloc-settings.js 写入 $persistentStore
-         → 下次 WLOC 触发 → wloc.js 读取坐标 → patch protobuf 响应
-```
-
-模块包含两条规则：
-- `wloc.js` — 拦截 `/clls/wloc` 响应，解析 protobuf 并替换坐标
-- `wloc-settings.js` — 拦截 `/wloc-settings/save` 请求，写入持久化存储
-
-</details>
+<!-- 原“工作原理”折叠内容已升级至页面上方的【底层原理与架构设计】小节 -->
 
 <details>
 <summary><b>参数配置</b></summary>
