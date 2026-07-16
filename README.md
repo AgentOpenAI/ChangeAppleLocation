@@ -44,6 +44,26 @@
 * **短链追踪**：Worker 自动追踪 302 重定向并提取出真实的地图长链接和坐标信息。
 * **火星坐标系（GCJ-02）逆偏转换算**：国内的苹果地图、高德地图使用的都是 GCJ-02 偏移坐标，而苹果 WLOC 机制底层需要标准的 WGS-84（地球坐标系）坐标。直接使用会导致数百米的偏差。Worker 会自动进行高精度的 GCJ-02 -> WGS-84 数学纠偏，将标准坐标返回给快捷指令，确保定位准确无误。
 
+### 4. 本地代理脚本 (dist/) 逆向架构与代码审计
+由于 iOS 代理软件（Surge 等）在本地执行 JS 脚本时对文件大小和运行效率有极高的要求，且部分依赖模块（如 `pako` 解压库）体积较大，原项目作者在发布时对 `dist/` 下的脚本进行了 **Minify 打包与代码混淆**。
+
+为了确保代码的安全性与透明度，在此为您提供对 `dist/wloc.js` 与 `dist/wloc-settings.js` 混淆代码的逆向工程结构分析：
+
+#### 📦 A. `dist/wloc.js` — WLOC 数据劫持与 Patch 脚本
+该脚本大小约 40KB，负责在网络层拦截、解密、Patch 并重打包定位数据。核心模块构成如下：
+1. **统一运行环境桥接库 (Platform Adapter)**：开头部分通过 `switch(true)` 判断 `globalThis.$task` (Quantumult X), `globalThis.$loon` (Loon), `globalThis.$rocket` (Shadowrocket) 等环境，封装了跨平台的本地日志器 `class t (Logger)` 和本地落盘类 `class o (Storage)`，使其能读写本地配置数据。
+2. **轻量级 Protobuf 扫描器 (Varint/Protobuf Scanner)**：集成了 `Ae` (Varint解码), `$e` (Varint编码), `Re` (数据段解析) 等核心算法。因为没有苹果 WLOC 响应体的完整 Protobuf 格式定义，脚本通过查找特定的 Wire Type 和 Field Number，递归解析出 Wi-Fi 设备定位列表（Field 2）和基站定位列表（Field 5）。
+3. **高精度坐标 Patch 算法 (Coordinate Injector)**：包含 `Oe` 算法。定位到 Wi-Fi 和基站的经纬度数据字段后，读取用户预设的经纬度，并将其乘以 $10^8$ 倍率换算为整数并重写 Varint 字段，更新整个 Protobuf 的长度。
+4. **Pako 解压缩库 (Gzip Deflate/Inflate)**：由于苹果返回的 WLOC 定位报文均经过 Gzip 压缩，脚本中完整集成了 `pako.inflate` 字节流解压算法。脚本对响应体执行 `ungzip ➔ patch protobuf ➔ gzip ➔ 返回设备` 的闭环操作。
+
+#### 📦 B. `dist/wloc-settings.js` — 设备端本地存储控制脚本
+该脚本大小约 12KB，负责管理本地持久化存储（`wloc_settings` 键值）。核心模块构成如下：
+1. **环境适配器与 HTTP 拦截器**：截获发往 `/wloc-settings/save` 的 HTTP 请求。
+2. **命令路由选择器**：
+   - **`action=save`** (默认)：从 URL query 参数中解析出 `lon`/`longitude`、`lat`/`latitude`、`acc`/`accuracy`（精度），封装为 JSON 对象存入本地 `wloc_settings`。
+   - **`action=query`**：读取并以 JSON 格式返回当前设备中生效的虚拟经纬度信息，供前端 Leaflet 选点地图呈现“当前生效”状态。
+   - **`action=clear`**：将本地 `wloc_settings` 数据擦除，使定位拦截脚本进入“透传模式”以恢复真实定位。
+
 ---
 
 ## 订阅地址
@@ -90,17 +110,14 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 
 ### 关于地图链接解析（worker）
 
-为了让苹果地图和高德走同一条流程，链接统一发给 `wloc-spoofer.wloc.workers.dev/api/parse` 解析：
+为了让苹果地图和高德走同一条流程，链接统一发给 `<您的Worker域名>/api/parse` 解析：
 
 - **高德**：分享出来是短链，真实坐标只藏在 302 跳转的 `Location` 头里，且是 GCJ-02 偏移坐标。快捷指令既读不到跳转头、也难做坐标换算，所以由 worker 跟跳转 → 抠坐标 → GCJ-02→WGS84 → 返回经纬度。
 - **苹果地图**：链接里直接带 `coordinate=纬度,经度`，但在**中国大陆同样是 GCJ-02 偏移坐标**，所以和高德一样由 worker 做 GCJ-02→WGS84 换算后返回；境外坐标会自动跳过换算（`out_of_china` 判断）原样返回。除了统一坐标系，走同一接口也方便统一处理短链、文本夹链接、名称解码等。
 
 **隐私：** `/api/parse` 是纯转发解析——收到链接 → 跟跳转 → 解析坐标 → 返回 JSON，全程不写任何存储、不记日志、不缓存，处理完即丢。
 
-**不放心可自行部署：** worker 源码完全开源，可自己部署一份替换上面的地址：
-
-- 解析逻辑：[`worker/src/parse.js`](worker/src/parse.js)，路由：[`worker/src/index.js`](worker/src/index.js)
-- 部署后把快捷指令里的 `wloc-spoofer.wloc.workers.dev` 换成你自己的 worker 域名即可。
+**部署个人 Worker：** worker 源码完全开源，建议自建部署后，将快捷指令中的域名替换为您的个人 Worker 域名即可。
 
 ---
 
@@ -108,7 +125,7 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 <summary><b>使用方法</b></summary>
 
 1. 订阅模块并启用 MITM
-2. 打开在线选点页面（公共 Worker，建议添加到主屏幕）
+2. 打开在线选点页面（您自建的 Worker 选点网页，建议添加到主屏幕）
 3. 地图选位置 / 搜索地名 / 粘贴地图链接
 4. 点击「储存到设备」
 5. 下次 Apple 定位触发时自动生效
@@ -198,10 +215,9 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 <details>
 <summary><b>自部署 Worker（推荐）</b></summary>
 
-公共选点页面有请求上限，建议部署自己的实例：
+本项目不提供任何公共托管实例以保证绝对的安全性与隐私。建议部署您本人的专属 Worker 服务，部署成功后，将各代理模块中的域名替换为您的个人域名：
 
-- **Workers**: `https://wloc-spoofer.wloc.workers.dev/`
-- **Pages**: `https://wloc-pages.pages.dev/`
+- **您的 Workers 域名**: `https://<您的Worker域名>/`
 
 **一键部署（Workers）：**
 

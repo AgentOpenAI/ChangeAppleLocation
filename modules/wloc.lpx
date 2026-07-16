@@ -3,7 +3,7 @@
 #!icon=https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/master/wloc.jpg
 #!author=AgentOpenAI
 #!homepage=https://github.com/AgentOpenAI/ChangeAppleLocation
-#!openUrl=https://wloc-pages.pages.dev/
+#!openUrl=https://<您的Worker域名>/
 
 [Argument]
 longitude = input, "113.94114", tag=经度(在线选点优先)
