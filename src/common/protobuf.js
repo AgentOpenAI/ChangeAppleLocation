@@ -489,3 +489,208 @@ export function patchWlocPayload(buffer, targetLocation) {
 
   throw new Error(`No patchable WLOC payload found in this response. Details: ${errors.join(" | ")}`);
 }
+
+/**
+ * Helper to convert Uint8Array/Array to hex string.
+ */
+function bytesToHex(bytes) {
+  if (!bytes) return "";
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Decode a generic field into a readable format.
+ */
+function decodeGenericField(field) {
+  if (field.wireType === 0) {
+    return field.value; // Varint value (number)
+  }
+  if (field.wireType === 1 || field.wireType === 5) {
+    return bytesToHex(field.value);
+  }
+  if (field.wireType === 2) {
+    const bytes = field.value;
+    const isPrintable = bytes.length > 0 && Array.from(bytes).every(b => b >= 32 && b <= 126);
+    if (isPrintable) {
+      return Array.from(bytes).map(b => String.fromCharCode(b)).join("");
+    }
+    return bytesToHex(bytes);
+  }
+  return null;
+}
+
+/**
+ * Decode the location structure (Field 1 = Lat, Field 2 = Lon, Field 3 = Acc).
+ */
+function decodeLocation(buffer) {
+  try {
+    const fields = scanProtobufFields(buffer);
+    const result = {
+      latitude: null,
+      longitude: null,
+      accuracy: null,
+      extraFields: {}
+    };
+    for (const field of fields) {
+      if (field.fieldNo === 1 && field.wireType === 0) {
+        result.latitude = field.value / 1e8;
+      } else if (field.fieldNo === 2 && field.wireType === 0) {
+        result.longitude = field.value / 1e8;
+      } else if (field.fieldNo === 3 && field.wireType === 0) {
+        result.accuracy = field.value;
+      } else {
+        result.extraFields[`field_${field.fieldNo}`] = decodeGenericField(field);
+      }
+    }
+    return result;
+  } catch (e) {
+    return { raw: bytesToHex(buffer), error: e.message };
+  }
+}
+
+/**
+ * Decode individual Wi-Fi message in Field 2.
+ */
+function decodeWiFiMessage(buffer) {
+  try {
+    const fields = scanProtobufFields(buffer);
+    const result = {
+      bssid: "",
+      location: null,
+      extraFields: {}
+    };
+    for (const field of fields) {
+      if (field.fieldNo === 1 && field.wireType === 2) {
+        result.bssid = Array.from(field.value).map(b => String.fromCharCode(b & 0xFF)).join("");
+      } else if (field.fieldNo === 2 && field.wireType === 2) {
+        result.location = decodeLocation(field.value);
+      } else {
+        result.extraFields[`field_${field.fieldNo}`] = decodeGenericField(field);
+      }
+    }
+    return result;
+  } catch (e) {
+    return { raw: bytesToHex(buffer), error: e.message };
+  }
+}
+
+/**
+ * Decode individual Cell Tower message in Field 22/24.
+ */
+function decodeCellTowerMessage(buffer) {
+  try {
+    const fields = scanProtobufFields(buffer);
+    const result = {
+      location: null,
+      extraFields: {}
+    };
+    for (const field of fields) {
+      if (field.fieldNo === 5 && field.wireType === 2) {
+        result.location = decodeLocation(field.value);
+      } else {
+        result.extraFields[`field_${field.fieldNo}`] = decodeGenericField(field);
+      }
+    }
+    return result;
+  } catch (e) {
+    return { raw: bytesToHex(buffer), error: e.message };
+  }
+}
+
+/**
+ * Parse a WLOC envelope payload.
+ */
+export function decodeWlocEnvelope(buffer) {
+  const fields = scanProtobufFields(buffer);
+  const result = {
+    wifiDevices: [],
+    cellTowers: [],
+    extraFields: {}
+  };
+
+  for (const field of fields) {
+    if (field.wireType === 2 && field.fieldNo === 2) {
+      result.wifiDevices.push(decodeWiFiMessage(field.value));
+    } else if (field.wireType === 2 && (field.fieldNo === 22 || field.fieldNo === 24)) {
+      result.cellTowers.push(decodeCellTowerMessage(field.value));
+    } else {
+      result.extraFields[`field_${field.fieldNo}`] = decodeGenericField(field);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Decode uncompressed WLOC packet into JSON representation (handles envelope parsing).
+ */
+export function decodeWlocToJSON(buffer) {
+  if (buffer.length < 10) {
+    return { error: `WLOC raw payload too short (${buffer.length} bytes)` };
+  }
+
+  const candidateOffsets = [0, 2, 4, 6, 8, 10, 12, 14, 16];
+  const maxSearchBound = Math.min(96, Math.max(0, buffer.length - 10));
+  for (let i = 0; i <= maxSearchBound; i++) {
+    if (!candidateOffsets.includes(i)) candidateOffsets.push(i);
+  }
+
+  // 1. Try to decode with envelope length alignment
+  for (const offset of candidateOffsets) {
+    try {
+      const payloadLen = (buffer[offset + 8] << 8) | buffer[offset + 9];
+      if (payloadLen > 0 && payloadLen + offset + 10 <= buffer.length) {
+        const payloadBytes = buffer.slice(offset + 10, offset + 10 + payloadLen);
+        const decoded = decodeWlocEnvelope(payloadBytes);
+        if (decoded.wifiDevices.length > 0 || decoded.cellTowers.length > 0) {
+          return {
+            parseType: "envelope_offset",
+            offset: offset,
+            header: bytesToHex(buffer.slice(0, offset + 10)),
+            payload: decoded,
+            trailing: bytesToHex(buffer.slice(offset + 10 + payloadLen))
+          };
+        }
+      }
+    } catch {
+      // ignore and try next offset
+    }
+  }
+
+  // 2. Fallback to parsing directly or violence scan
+  const maxScanBytes = Math.min(256, buffer.length);
+  for (let offset = 0; offset <= maxScanBytes; offset++) {
+    try {
+      const decoded = decodeWlocEnvelope(buffer.slice(offset));
+      if (decoded.wifiDevices.length > 0 || decoded.cellTowers.length > 0) {
+        return {
+          parseType: "fallback_raw_scan",
+          offset: offset,
+          header: bytesToHex(buffer.slice(0, offset)),
+          payload: decoded
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. Last fallback: decode generic fields of the buffer itself as a protobuf message
+  try {
+    const fields = scanProtobufFields(buffer);
+    const result = {};
+    for (const field of fields) {
+      result[`field_${field.fieldNo}`] = decodeGenericField(field);
+    }
+    return {
+      parseType: "generic_protobuf_fallback",
+      payload: result
+    };
+  } catch (e) {
+    return {
+      parseType: "unparsed_hex",
+      rawHex: bytesToHex(buffer),
+      error: e.message
+    };
+  }
+}
