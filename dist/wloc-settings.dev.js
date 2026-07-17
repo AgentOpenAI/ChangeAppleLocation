@@ -308,22 +308,38 @@
       case "Surge":
         if (responseObj.policy) responseObj.headers = { ...responseObj.headers, "X-Surge-Policy": responseObj.policy };
         logger.info(`[Adapter] Surge \u811A\u672C\u6267\u884C\u7ED3\u675F. \u7528\u65F6: ${((/* @__PURE__ */ new Date()).getTime() - $script.startTime) / 1e3}s`);
-        $done(responseObj);
+        if (typeof $request !== "undefined" && typeof $response === "undefined") {
+          $done({ response: responseObj });
+        } else {
+          $done(responseObj);
+        }
         break;
       case "Loon":
         if (responseObj.policy) responseObj.node = responseObj.policy;
         logger.info(`[Adapter] Loon \u811A\u672C\u6267\u884C\u7ED3\u675F. \u7528\u65F6: ${(/* @__PURE__ */ new Date() - $script.startTime) / 1e3}s`);
-        $done(responseObj);
+        if (typeof $request !== "undefined" && typeof $response === "undefined") {
+          $done({ response: responseObj });
+        } else {
+          $done(responseObj);
+        }
         break;
       case "Stash":
         if (responseObj.policy) responseObj.headers = { ...responseObj.headers, "X-Stash-Selected-Proxy": encodeURI(responseObj.policy) };
         logger.info(`[Adapter] Stash \u811A\u672C\u6267\u884C\u7ED3\u675F. \u7528\u65F6: ${(/* @__PURE__ */ new Date() - $script.startTime) / 1e3}s`);
-        $done(responseObj);
+        if (typeof $request !== "undefined" && typeof $response === "undefined") {
+          $done({ response: responseObj });
+        } else {
+          $done(responseObj);
+        }
         break;
       case "Egern":
       case "Shadowrocket":
         logger.info(`[Adapter] ${env} \u811A\u672C\u6267\u884C\u7ED3\u675F.`);
-        $done(responseObj);
+        if (typeof $request !== "undefined" && typeof $response === "undefined") {
+          $done({ response: responseObj });
+        } else {
+          $done(responseObj);
+        }
         break;
       case "Quantumult X":
         if (responseObj.policy) responseObj.opts = { ...responseObj.opts, policy: responseObj.policy };

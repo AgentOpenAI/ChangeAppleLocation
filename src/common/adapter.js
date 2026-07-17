@@ -355,22 +355,38 @@ export function done(responseObj = {}) {
     case "Surge":
       if (responseObj.policy) responseObj.headers = { ...responseObj.headers, "X-Surge-Policy": responseObj.policy };
       logger.info(`[Adapter] Surge 脚本执行结束. 用时: ${(new Date().getTime() - $script.startTime) / 1000}s`);
-      $done(responseObj);
+      if (typeof $request !== "undefined" && typeof $response === "undefined") {
+        $done({ response: responseObj });
+      } else {
+        $done(responseObj);
+      }
       break;
     case "Loon":
       if (responseObj.policy) responseObj.node = responseObj.policy;
       logger.info(`[Adapter] Loon 脚本执行结束. 用时: ${(new Date() - $script.startTime) / 1000}s`);
-      $done(responseObj);
+      if (typeof $request !== "undefined" && typeof $response === "undefined") {
+        $done({ response: responseObj });
+      } else {
+        $done(responseObj);
+      }
       break;
     case "Stash":
       if (responseObj.policy) responseObj.headers = { ...responseObj.headers, "X-Stash-Selected-Proxy": encodeURI(responseObj.policy) };
       logger.info(`[Adapter] Stash 脚本执行结束. 用时: ${(new Date() - $script.startTime) / 1000}s`);
-      $done(responseObj);
+      if (typeof $request !== "undefined" && typeof $response === "undefined") {
+        $done({ response: responseObj });
+      } else {
+        $done(responseObj);
+      }
       break;
     case "Egern":
     case "Shadowrocket":
       logger.info(`[Adapter] ${env} 脚本执行结束.`);
-      $done(responseObj);
+      if (typeof $request !== "undefined" && typeof $response === "undefined") {
+        $done({ response: responseObj });
+      } else {
+        $done(responseObj);
+      }
       break;
     case "Quantumult X":
       // QX 需要特殊的参数格式过滤
