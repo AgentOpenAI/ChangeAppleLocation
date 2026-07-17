@@ -155,11 +155,11 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
 <script>
 const SAVE_API = 'https://gs-loc.apple.com/wloc-settings/save';
 const FAV_KEY = 'wloc_favorites';
-let lat = 22.544577, lon = 113.94114;
+let lat = 39.9042, lon = 116.4074; // 默认使用北京中心坐标，不使用特定腾讯大厦值
 let selected = false;
 let activeLon = null, activeLat = null;
 
-const map = L.map('map').setView([lat, lon], 13);
+const map = L.map('map').setView([lat, lon], 12);
 const tiles = {
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'ArcGIS'}),
   wgs84: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'ArcGIS WGS84'}),
@@ -348,8 +348,8 @@ async function save() {
       const accDisplay = acc === 25 ? '25m (自动随机化)' : acc + 'm';
       document.getElementById('activeValue').textContent = '经度 ' + lon.toFixed(6) + '  纬度 ' + lat.toFixed(6) + '  精度 ' + accDisplay;
       renderFavs();
-      toast('\\u2713 坐标已写入设备，下次定位生效');
-      setTimeout(() => { btn.textContent='储存到设备'; btn.className='btn btn-primary'; btn.disabled=false; }, 2500);
+      toast('\\u2713 坐标已写入设备，建议开关一次「定位服务」或开关「飞行模式」，如未生效请重启设备清空定位缓存');
+      setTimeout(() => { btn.textContent='储存到设备'; btn.className='btn btn-primary'; btn.disabled=false; }, 4000);
     } else {
       throw new Error(d.error || '写入失败');
     }

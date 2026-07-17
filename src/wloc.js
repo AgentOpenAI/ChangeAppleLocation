@@ -7,10 +7,10 @@ import pako from "pako";
 import { logger, storage, done } from "./common/adapter.js";
 import { patchWlocPayload, decodeWlocToJSON } from "./common/protobuf.js";
 
-// WLOC 预设默认配置参数（透传判断基准点：深圳市腾讯大厦附近）
+// WLOC 预设默认配置参数（默认 0, 0 为透传放行、恢复真实定位基准值）
 const DEFAULT_COORDS = {
-  longitude: 113.94114,
-  latitude: 22.544577,
+  longitude: 0,
+  latitude: 0,
   accuracy: 25,
   logLevel: "info"
 };

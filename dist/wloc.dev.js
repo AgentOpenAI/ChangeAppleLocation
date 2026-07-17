@@ -5067,8 +5067,8 @@
 
   // src/wloc.js
   var DEFAULT_COORDS = {
-    longitude: 113.94114,
-    latitude: 22.544577,
+    longitude: 0,
+    latitude: 0,
     accuracy: 25,
     logLevel: "info"
   };
