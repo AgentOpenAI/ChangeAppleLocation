@@ -5,7 +5,7 @@
 
 import pako from "pako";
 import { logger, storage, done } from "./common/adapter.js";
-import { patchWlocPayload } from "./common/protobuf.js";
+import { patchWlocPayload, decodeWlocToJSON } from "./common/protobuf.js";
 
 // WLOC 预设默认配置参数（透传判断基准点：深圳市腾讯大厦附近）
 const DEFAULT_COORDS = {
@@ -174,6 +174,14 @@ function getActiveLocation() {
     
     if (wasGzipped) {
       uncompressedBytes = pako.inflate(originalBodyBytes);
+    }
+
+    // 打印并输出未修改的完整原始报文 JSON 结构
+    try {
+      const rawJson = decodeWlocToJSON(uncompressedBytes);
+      logger.info(`[WLOC-Raw-Payload-JSON]: ${JSON.stringify(rawJson, null, 2)}`);
+    } catch (e) {
+      logger.warn(`[WLOC] 打印原始报文 JSON 失败: ${e.message}`);
     }
 
     // 5. 对解压后的 Protobuf 消息流注入目标坐标
