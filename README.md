@@ -110,7 +110,7 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 
 ### 关于地图链接解析（worker）
 
-为了让苹果地图和高德走同一条流程，链接统一发给 `<您的Worker域名>/api/parse` 解析：
+为了让苹果地图和高德走同一条流程，链接统一发给 `changeapplelocation.appleai.workers.dev/api/parse` 解析：
 
 - **高德**：分享出来是短链，真实坐标只藏在 302 跳转的 `Location` 头里，且是 GCJ-02 偏移坐标。快捷指令既读不到跳转头、也难做坐标换算，所以由 worker 跟跳转 → 抠坐标 → GCJ-02→WGS84 → 返回经纬度。
 - **苹果地图**：链接里直接带 `coordinate=纬度,经度`，但在**中国大陆同样是 GCJ-02 偏移坐标**，所以和高德一样由 worker 做 GCJ-02→WGS84 换算后返回；境外坐标会自动跳过换算（`out_of_china` 判断）原样返回。除了统一坐标系，走同一接口也方便统一处理短链、文本夹链接、名称解码等。
@@ -217,7 +217,7 @@ https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/mas
 
 本项目不提供任何公共托管实例以保证绝对的安全性与隐私。建议部署您本人的专属 Worker 服务，部署成功后，将各代理模块中的域名替换为您的个人域名：
 
-- **您的 Workers 域名**: `https://<您的Worker域名>/`
+- **您的 Workers 域名**: `https://changeapplelocation.appleai.workers.dev/`
 
 **一键部署（Workers）：**
 

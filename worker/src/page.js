@@ -90,6 +90,15 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
   <div class="card">
     <h3>选择目标位置</h3>
     <div class="coords" id="coords">点击地图或使用下方工具选择位置</div>
+    <div style="margin-top:12px;">
+      <div style="font-size:13px; font-weight:500; margin-bottom:6px; color:#333;">定位精度（米）:</div>
+      <div class="input-row" style="margin-top:0;">
+        <input id="accuracyInput" type="number" value="25" min="1" max="1000" placeholder="默认 25" style="padding:10px 12px; margin-top:0;" />
+      </div>
+      <div style="font-size:11px; color:var(--gray); margin-top:4px; line-height:1.4;">
+        提示：默认设为 25 米时，核心代理脚本将自动启用 <b>10-30米之间的动态随机精度</b> 和 <b>经纬度微米级抖动联动算法</b>，模拟真实定位，更经得起检测。
+      </div>
+    </div>
     <div class="row">
       <button class="btn btn-primary" id="saveBtn" onclick="save()">储存到设备</button>
       <button class="btn btn-secondary" onclick="addFav()">收藏位置</button>
@@ -284,7 +293,10 @@ function queryActive() {
       if (d.success && d.longitude && d.latitude) {
         activeLon = parseFloat(d.longitude);
         activeLat = parseFloat(d.latitude);
-        el.textContent = '经度 ' + activeLon.toFixed(6) + '  纬度 ' + activeLat.toFixed(6) + (d.accuracy ? '  精度 ' + d.accuracy + 'm' : '');
+        const savedAcc = d.accuracy ? parseInt(d.accuracy, 10) : 25;
+        document.getElementById('accuracyInput').value = savedAcc;
+        const accDisplay = savedAcc === 25 ? '25m (自动随机化)' : savedAcc + 'm';
+        el.textContent = '经度 ' + activeLon.toFixed(6) + '  纬度 ' + activeLat.toFixed(6) + '  精度 ' + accDisplay;
         renderFavs();
       } else {
         activeLon = null; activeLat = null;
@@ -318,8 +330,13 @@ async function save() {
   const btn = document.getElementById('saveBtn');
   btn.textContent = '储存中...'; btn.disabled = true;
   showError(false);
+
+  const accInput = document.getElementById('accuracyInput');
+  let acc = parseInt(accInput.value, 10);
+  if (isNaN(acc) || acc <= 0) acc = 25;
+
   try {
-    const r = await fetch(SAVE_API + '?lon=' + lon + '&lat=' + lat + '&acc=25', {
+    const r = await fetch(SAVE_API + '?lon=' + lon + '&lat=' + lat + '&acc=' + acc, {
       method: 'GET', mode: 'cors', cache: 'no-store'
     });
     const d = await r.json();
@@ -327,7 +344,9 @@ async function save() {
       activeLon = lon; activeLat = lat;
       btn.textContent = '\\u2713 已储存'; btn.className = 'btn btn-primary success';
       document.getElementById('status').textContent = '\\u2713 已写入: ' + lon.toFixed(6) + ', ' + lat.toFixed(6) + ' \\u00b7 ' + new Date().toLocaleTimeString('zh-CN');
-      document.getElementById('activeValue').textContent = '经度 ' + lon.toFixed(6) + '  纬度 ' + lat.toFixed(6) + '  精度 25m';
+
+      const accDisplay = acc === 25 ? '25m (自动随机化)' : acc + 'm';
+      document.getElementById('activeValue').textContent = '经度 ' + lon.toFixed(6) + '  纬度 ' + lat.toFixed(6) + '  精度 ' + accDisplay;
       renderFavs();
       toast('\\u2713 坐标已写入设备，下次定位生效');
       setTimeout(() => { btn.textContent='储存到设备'; btn.className='btn btn-primary'; btn.disabled=false; }, 2500);
