@@ -148,6 +148,44 @@ function getActiveLocation() {
   const targetLocation = getActiveLocation();
   if (targetLocation) {
     logger.setLogLevel(targetLocation.logLevel);
+
+    // 如果精度为默认值 25 米，启用动态随机精度和微米级坐标抖动联动算法
+    if (targetLocation.accuracy === 25) {
+      // 生成 10-30 之间的随机整数精度
+      const randomAcc = Math.floor(Math.random() * 21) + 10; // [10, 30]
+
+      // 经纬度微抖动：保留前5位小数不变，第6位到第14位进行随机化，并与精度 A 进行比例联动
+      const origLat = targetLocation.latitude;
+      const origLon = targetLocation.longitude;
+
+      // 截断到小数点前5位基准（处理正负值以防舍入方向错误）
+      const get5DecBase = (val) => {
+        const sign = Math.sign(val);
+        const absVal = Math.abs(val);
+        return sign * (Math.floor(absVal * 100000) / 100000);
+      };
+
+      const latBase = get5DecBase(origLat);
+      const lonBase = get5DecBase(origLon);
+
+      // 联动：精度 A 越大代表信号越差，抖动幅度越大；精度 A 越小，抖动越小。
+      // 我们限制最大抖动范围在 0.00000999999999 度以内（从而绝对不会影响到第5位小数）
+      const maxJitterDegree = 0.00000999999999;
+      const scaleFactor = randomAcc / 30; // [10/30, 30/30] => [0.33, 1.0]
+
+      // 生成完全随机的第 6 至 14 位小数抖动量
+      const latJitter = Math.random() * maxJitterDegree * scaleFactor;
+      const lonJitter = Math.random() * maxJitterDegree * scaleFactor;
+
+      const signLat = Math.sign(origLat);
+      const signLon = Math.sign(origLon);
+
+      targetLocation.latitude = latBase + (signLat >= 0 ? latJitter : -latJitter);
+      targetLocation.longitude = lonBase + (signLon >= 0 ? lonJitter : -lonJitter);
+      targetLocation.accuracy = randomAcc;
+
+      logger.info(`[WLOC] 触发 25m 随机抖动算法：动态精度=${randomAcc}m, 经度=${origLon.toFixed(6)}->${targetLocation.longitude}, 纬度=${origLat.toFixed(6)}->${targetLocation.latitude}`);
+    }
   }
 
   logger.group(`WLOC 定位修改服务 - ${requestUrl}`);
