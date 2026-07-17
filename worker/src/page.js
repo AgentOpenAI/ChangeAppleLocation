@@ -155,11 +155,11 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
 <script>
 const SAVE_API = 'https://gs-loc.apple.com/wloc-settings/save';
 const FAV_KEY = 'wloc_favorites';
-let lat = 39.9042, lon = 116.4074; // 默认使用北京中心坐标，不使用特定腾讯大厦值
+let lat = 0, lon = 0; // 默认使用0, 0
 let selected = false;
 let activeLon = null, activeLat = null;
 
-const map = L.map('map').setView([lat, lon], 12);
+const map = L.map('map').setView([lat, lon], 13);
 const tiles = {
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'ArcGIS'}),
   wgs84: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'ArcGIS WGS84'}),
