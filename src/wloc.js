@@ -200,23 +200,23 @@ function padTo13Or14Decimals(val) {
       // 触发范围随机抖动
       const randomAcc = Math.floor(Math.random() * (maxBound - minBound + 1)) + minBound;
 
-      // 经纬度微抖动：保留前5位小数不变，第6位到第14位进行随机化，并与生成的随机精度进行比例联动
+      // 经纬度微抖动：保留前4位小数不变，第5位到第14位进行随机化，并与生成的随机精度进行比例联动
       const origLat = targetLocation.latitude;
       const origLon = targetLocation.longitude;
 
-      // 截断到小数点前5位基准（处理正负值以防舍入方向错误）
-      const get5DecBase = (val) => {
+      // 截断到小数点前4位基准（处理正负值以防舍入方向错误）
+      const get4DecBase = (val) => {
         const sign = Math.sign(val);
         const absVal = Math.abs(val);
-        return sign * (Math.floor(absVal * 100000) / 100000);
+        return sign * (Math.floor(absVal * 10000) / 10000);
       };
 
-      const latBase = get5DecBase(origLat);
-      const lonBase = get5DecBase(origLon);
+      const latBase = get4DecBase(origLat);
+      const lonBase = get4DecBase(origLon);
 
       // 联动：精度越大信号越差，抖动幅度越大。
-      // 我们限制最大抖动范围在 0.00000999999999 度以内（从而绝对不会影响到第5位小数）
-      const maxJitterDegree = 0.00000999999999;
+      // 我们限制最大抖动范围在 0.00009999999999 度以内（从而绝对不会影响到第4位小数）
+      const maxJitterDegree = 0.00009999999999;
       const scaleFactor = randomAcc / maxBound; // 比例因子
 
       const latJitter = Math.random() * maxJitterDegree * scaleFactor;
