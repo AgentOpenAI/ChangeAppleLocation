@@ -462,14 +462,28 @@ async function searchPlace() {
       return;
     }
 
-    resContainer.innerHTML = results.map((p, i) => {
-      const displayName = p.display_name;
-      const safeName = displayName.replace(/'/g, "\\u0027").replace(/"/g, "\\u0022");
-      return '<div class="search-item" onclick="selectSearchResult(' + p.lat + ', ' + p.lon + ', \'' + safeName + '\')">' +
-        '<div style="font-weight:500;line-height:1.3;">' + (i+1) + '. ' + displayName + '</div>' +
-        '<div style="font-size:11px;color:var(--gray);font-family:monospace;margin-top:2px;">经度: ' + parseFloat(p.lon).toFixed(6) + ', 纬度: ' + parseFloat(p.lat).toFixed(6) + '</div>' +
-      '</div>';
-    }).join('');
+    resContainer.innerHTML = '';
+    results.forEach((p, i) => {
+      const item = document.createElement('div');
+      item.className = 'search-item';
+      item.onclick = () => selectSearchResult(p.lat, p.lon, p.display_name);
+
+      const title = document.createElement('div');
+      title.style.fontWeight = '500';
+      title.style.lineHeight = '1.3';
+      title.textContent = (i + 1) + '. ' + p.display_name;
+
+      const meta = document.createElement('div');
+      meta.style.fontSize = '11px';
+      meta.style.color = 'var(--gray)';
+      meta.style.fontFamily = 'monospace';
+      meta.style.marginTop = '2px';
+      meta.textContent = '经度: ' + parseFloat(p.lon).toFixed(6) + ', 纬度: ' + parseFloat(p.lat).toFixed(6);
+
+      item.appendChild(title);
+      item.appendChild(meta);
+      resContainer.appendChild(item);
+    });
   } catch(e) {
     resContainer.innerHTML = '<div style="color:var(--red);padding:12px;font-size:13px;text-align:center;">搜索失败，请稍后重试</div>';
   }

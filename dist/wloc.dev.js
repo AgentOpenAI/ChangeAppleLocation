@@ -5156,6 +5156,30 @@
     }
     return activeConfig;
   }
+  function padTo13Or14Decimals(val) {
+    const str = String(val);
+    const dotIdx = str.indexOf(".");
+    let decimals = 0;
+    if (dotIdx !== -1) {
+      decimals = str.substring(dotIdx + 1).replace(/0+$/, "").length;
+    }
+    if (decimals >= 13) {
+      return val;
+    }
+    const targetDecimals = 13 + Math.floor(Math.random() * 2);
+    const digitsToFill = targetDecimals - decimals;
+    let suffix = "";
+    for (let i = 0; i < digitsToFill; i++) {
+      suffix += Math.floor(Math.random() * 10);
+    }
+    let cleanStr = str;
+    if (dotIdx !== -1) {
+      cleanStr = str.substring(0, dotIdx + 1) + str.substring(dotIdx + 1).replace(/0+$/, "");
+    } else {
+      cleanStr = str + ".";
+    }
+    return parseFloat(cleanStr + suffix);
+  }
   (async () => {
     const requestUrl = typeof $request !== "undefined" ? $request.url : "";
     const response = typeof $response !== "undefined" ? $response : null;
@@ -5202,6 +5226,8 @@
         targetLocation.accuracy = randomAcc;
         logger.info(`[WLOC] \u89E6\u53D1 [${minBound}:${maxBound}] \u8303\u56F4\u968F\u673A\u6296\u52A8\u7B97\u6CD5\uFF1A\u52A8\u6001\u7CBE\u5EA6=${randomAcc}m, \u7ECF\u5EA6=${origLon.toFixed(6)}->${targetLocation.longitude}, \u7EAC\u5EA6=${origLat.toFixed(6)}->${targetLocation.latitude}`);
       } else {
+        targetLocation.latitude = padTo13Or14Decimals(targetLocation.latitude);
+        targetLocation.longitude = padTo13Or14Decimals(targetLocation.longitude);
         const accNum = parseInt(targetLocation.accuracy, 10);
         targetLocation.accuracy = isNaN(accNum) || accNum <= 0 ? 25 : accNum;
       }
