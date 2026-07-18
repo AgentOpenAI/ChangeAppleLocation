@@ -5208,14 +5208,14 @@
         const randomAcc = Math.floor(Math.random() * (maxBound - minBound + 1)) + minBound;
         const origLat = targetLocation.latitude;
         const origLon = targetLocation.longitude;
-        const get5DecBase = (val) => {
+        const get4DecBase = (val) => {
           const sign = Math.sign(val);
           const absVal = Math.abs(val);
-          return sign * (Math.floor(absVal * 1e5) / 1e5);
+          return sign * (Math.floor(absVal * 1e4) / 1e4);
         };
-        const latBase = get5DecBase(origLat);
-        const lonBase = get5DecBase(origLon);
-        const maxJitterDegree = 999999999e-14;
+        const latBase = get4DecBase(origLat);
+        const lonBase = get4DecBase(origLon);
+        const maxJitterDegree = 9999999999e-14;
         const scaleFactor = randomAcc / maxBound;
         const latJitter = Math.random() * maxJitterDegree * scaleFactor;
         const lonJitter = Math.random() * maxJitterDegree * scaleFactor;
