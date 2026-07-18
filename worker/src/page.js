@@ -445,7 +445,8 @@ async function searchPlace() {
 
     resContainer.innerHTML = results.map((p, i) => {
       const displayName = p.display_name;
-      return '<div class="search-item" onclick="selectSearchResult(' + p.lat + ', ' + p.lon + ', `' + displayName.replace(/\'/g, "\\'").replace(/`/g, "\\`") + '`)">' +
+      const safeName = displayName.replace(/'/g, "\\u0027").replace(/"/g, "\\u0022");
+      return '<div class="search-item" onclick="selectSearchResult(' + p.lat + ', ' + p.lon + ', \'' + safeName + '\')">' +
         '<div style="font-weight:500;line-height:1.3;">' + (i+1) + '. ' + displayName + '</div>' +
         '<div style="font-size:11px;color:var(--gray);font-family:monospace;margin-top:2px;">经度: ' + parseFloat(p.lon).toFixed(6) + ', 纬度: ' + parseFloat(p.lat).toFixed(6) + '</div>' +
       '</div>';
