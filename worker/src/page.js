@@ -50,6 +50,9 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
 .fav-item .fav-del:hover { background:rgba(255,59,48,.1); }
 .fav-empty { text-align:center; color:var(--gray); font-size:13px; padding:16px 0; }
 .fav-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .search-item { padding:10px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; color:#333; transition:background .15s; }
+  .search-item:active { background:#e5e5ea; }
+  .search-item:last-child { border-bottom:none; }
 .fav-header h3 { margin-bottom:0; }
 .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.4); z-index:10000; display:none; align-items:center; justify-content:center; padding:20px; }
 .modal-overlay.show { display:flex; }
@@ -134,8 +137,12 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
   <div class="card">
     <h3>搜索地点</h3>
     <div class="input-row">
-      <input id="searchInput" placeholder="输入地名（如: 上海外滩）" />
+      <input id="searchInput" placeholder="输入地名（如: 深圳 腾讯大厦）" />
       <button class="btn btn-secondary" style="flex:none;min-width:56px" onclick="searchPlace()">搜索</button>
+    </div>
+    <div id="searchResults" style="margin-top:10px; max-height:220px; overflow-y:auto; display:none; background:var(--bg); border-radius:8px;"></div>
+    <div style="font-size:11px;color:var(--gray);margin-top:6px;line-height:1.4;">
+      提示：国内详细大楼/小区搜索，建议在关键词前<b>加上城市名</b>（如：<b>'深圳 腾讯大厦'</b>、<b>'北京 故宫'</b>），搜索精准度会显著提高！
     </div>
   </div>
   <div class="status" id="status">选好位置后点击「储存到设备」写入代理工具</div>
@@ -390,27 +397,68 @@ function parseMapUrl(text) {
   return null;
 }
 
-function parseUrl() {
+async function parseUrl() {
   const input = document.getElementById('urlInput').value.trim();
   if (!input) return toast('请粘贴地图链接或坐标');
+
+  // 如果输入的是网址（高德、苹果地图链接等），通过 Worker 端的解析 API 进行 302 重定向解析并自动进行 GCJ02 -> WGS84 高精度纠偏
+  if (input.startsWith('http') || input.includes('amap.com') || input.includes('apple.com')) {
+    toast('正在通过云端解析并进行高精度 WGS84 纠偏...');
+    try {
+      const r = await fetch('/api/parse?format=json&u=' + encodeURIComponent(input));
+      const d = await r.json();
+      if (d.lat && d.lon) {
+        moveTo(d.lat, d.lon, 15);
+        toast('解析成功: ' + (d.name || '已同步至目标坐标'));
+      } else {
+        throw new Error(d.error || '无法提取坐标');
+      }
+    } catch(e) {
+      toast('云端解析失败: ' + e.message, 3500);
+    }
+    return;
+  }
+
+  // 如果是纯文本坐标，走本地正则提取
   const result = parseMapUrl(input);
   if (!result) { toast('无法解析坐标，请检查链接格式', 3000); return; }
   moveTo(result.lat, result.lon, 15);
-  toast('已解析: ' + result.lon.toFixed(4) + ', ' + result.lat.toFixed(4));
+  toast('本地坐标解析成功: ' + result.lon.toFixed(5) + ', ' + result.lat.toFixed(5));
 }
 
 async function searchPlace() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return toast('请输入地名');
-  toast('搜索中...');
+
+  const resContainer = document.getElementById('searchResults');
+  resContainer.innerHTML = '<div style="color:var(--gray);padding:12px;font-size:13px;text-align:center;">搜索中...</div>';
+  resContainer.style.display = 'block';
+
   try {
-    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
+    // 增加 limit 数量至 5，并增加国别 (cn) 及中文语言偏好限制，大幅提高中国大陆建筑大楼搜索准确率
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=cn&accept-language=zh-CN&q=' + encodeURIComponent(q));
     const results = await r.json();
-    if (!results.length) { toast('未找到: ' + q, 3000); return; }
-    const p = results[0];
-    moveTo(parseFloat(p.lat), parseFloat(p.lon), 15);
-    toast(p.display_name.slice(0, 40));
-  } catch(e) { toast('搜索失败', 3000); }
+    if (!results.length) {
+      resContainer.innerHTML = '<div style="color:var(--red);padding:12px;font-size:13px;text-align:center;">未找到相关地点。建议在词前加上城市名（如: 深圳 腾讯大厦）</div>';
+      return;
+    }
+
+    resContainer.innerHTML = results.map((p, i) => {
+      const displayName = p.display_name;
+      return '<div class="search-item" onclick="selectSearchResult(' + p.lat + ', ' + p.lon + ', `' + displayName.replace(/\'/g, "\\'").replace(/`/g, "\\`") + '`)">' +
+        '<div style="font-weight:500;line-height:1.3;">' + (i+1) + '. ' + displayName + '</div>' +
+        '<div style="font-size:11px;color:var(--gray);font-family:monospace;margin-top:2px;">经度: ' + parseFloat(p.lon).toFixed(6) + ', 纬度: ' + parseFloat(p.lat).toFixed(6) + '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    resContainer.innerHTML = '<div style="color:var(--red);padding:12px;font-size:13px;text-align:center;">搜索失败，请稍后重试</div>';
+  }
+}
+
+function selectSearchResult(lat, lon, name) {
+  moveTo(lat, lon, 15);
+  document.getElementById('searchResults').style.display = 'none';
+  toast('已成功定位: ' + name.split(',')[0]);
 }
 
 document.addEventListener('paste', e => {
