@@ -1,5 +1,5 @@
 name: Apple WLOC 定位修改
-desc: "修改 Apple 网络定位返回坐标 | 快捷指令(推荐): 设置地理位置 https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7 清理恢复位置 https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f | 选点页面: https://changeapplelocation.appleai.workers.dev/"
+desc: "修改 Apple 网络定位返回坐标 | 快捷指令:设置位置 https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7 清理恢复 https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f | 选点:https://changeapplelocation.appleai.workers.dev/ | 使用方法:选点 -> 储存 -> 开关定位服务或重启生效"
 author: AgentOpenAI
 homepage: https://github.com/AgentOpenAI/ChangeAppleLocation
 icon: https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/master/wloc.jpg
@@ -17,7 +17,7 @@ http:
       binary-mode: true
       max-size: 0
       timeout: 30
-      argument: longitude=113.94114&latitude=22.544577&accuracy=25&logLevel=info
+      argument: longitude=0&latitude=0&accuracy=25&logLevel=info
     - match: ^https?:\/\/gs-loc(-cn)?\.apple\.com\/wloc-settings\/save
       name: WLOC.Settings
       type: request

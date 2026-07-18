@@ -7,10 +7,10 @@ import pako from "pako";
 import { logger, storage, done } from "./common/adapter.js";
 import { patchWlocPayload, decodeWlocToJSON } from "./common/protobuf.js";
 
-// WLOC 预设默认配置参数（透传判断基准点：深圳市腾讯大厦附近）
+// WLOC 预设默认配置参数（默认 0, 0 为透传放行、恢复真实定位基准值）
 const DEFAULT_COORDS = {
-  longitude: 113.94114,
-  latitude: 22.544577,
+  longitude: 0,
+  latitude: 0,
   accuracy: 25,
   logLevel: "info"
 };
@@ -112,15 +112,15 @@ function getActiveLocation() {
 
   if (argConfig.longitude) activeConfig.longitude = parseFloat(argConfig.longitude);
   if (argConfig.latitude) activeConfig.latitude = parseFloat(argConfig.latitude);
-  if (argConfig.accuracy) activeConfig.accuracy = parseInt(argConfig.accuracy, 10);
+  if (argConfig.accuracy) activeConfig.accuracy = isNaN(Number(argConfig.accuracy)) ? String(argConfig.accuracy).trim() : parseInt(argConfig.accuracy, 10);
   if (argConfig.logLevel) activeConfig.logLevel = argConfig.logLevel;
   if (argConfig.LogLevel) activeConfig.logLevel = argConfig.LogLevel;
 
   if (savedConfig) {
     if (savedConfig.longitude) activeConfig.longitude = parseFloat(savedConfig.longitude);
     if (savedConfig.latitude) activeConfig.latitude = parseFloat(savedConfig.latitude);
-    if (savedConfig.accuracy) activeConfig.accuracy = parseInt(savedConfig.accuracy, 10);
-    logger.info(`[Settings] 读取并使用已保存坐标: lon=${activeConfig.longitude}, lat=${activeConfig.latitude}`);
+    if (savedConfig.accuracy) activeConfig.accuracy = isNaN(Number(savedConfig.accuracy)) ? String(savedConfig.accuracy).trim() : parseInt(savedConfig.accuracy, 10);
+    logger.info(`[Settings] 读取并使用已保存坐标: lon=${activeConfig.longitude}, lat=${activeConfig.latitude}, 原始配置精度=${activeConfig.accuracy}`);
   } else {
     // 若持久化配置为空，且参数中依然为预设的默认坐标点，则判定用户并未自定义过虚拟定位，触发“透传放行”
     const isDefaultLon = Math.abs(activeConfig.longitude - DEFAULT_COORDS.longitude) < 0.00001;
@@ -149,12 +149,28 @@ function getActiveLocation() {
   if (targetLocation) {
     logger.setLogLevel(targetLocation.logLevel);
 
-    // 如果精度为默认值 25 米，启用动态随机精度和微米级坐标抖动联动算法
-    if (targetLocation.accuracy === 25) {
-      // 生成 10-30 之间的随机整数精度
-      const randomAcc = Math.floor(Math.random() * 21) + 10; // [10, 30]
+    // 解析是否是范围随机模式，例如 "10:100"
+    let isRangeRandom = false;
+    let minBound = 10;
+    let maxBound = 100;
+    const accStr = String(targetLocation.accuracy);
 
-      // 经纬度微抖动：保留前5位小数不变，第6位到第14位进行随机化，并与精度 A 进行比例联动
+    if (accStr.includes(":")) {
+      const parts = accStr.split(":");
+      const p1 = parseInt(parts[0], 10);
+      const p2 = parseInt(parts[1], 10);
+      if (!isNaN(p1) && !isNaN(p2) && p1 > 0 && p2 > 0) {
+        minBound = Math.min(p1, p2);
+        maxBound = Math.max(p1, p2);
+        isRangeRandom = true;
+      }
+    }
+
+    if (isRangeRandom) {
+      // 触发范围随机抖动
+      const randomAcc = Math.floor(Math.random() * (maxBound - minBound + 1)) + minBound;
+
+      // 经纬度微抖动：保留前5位小数不变，第6位到第14位进行随机化，并与生成的随机精度进行比例联动
       const origLat = targetLocation.latitude;
       const origLon = targetLocation.longitude;
 
@@ -168,12 +184,11 @@ function getActiveLocation() {
       const latBase = get5DecBase(origLat);
       const lonBase = get5DecBase(origLon);
 
-      // 联动：精度 A 越大代表信号越差，抖动幅度越大；精度 A 越小，抖动越小。
+      // 联动：精度越大信号越差，抖动幅度越大。
       // 我们限制最大抖动范围在 0.00000999999999 度以内（从而绝对不会影响到第5位小数）
       const maxJitterDegree = 0.00000999999999;
-      const scaleFactor = randomAcc / 30; // [10/30, 30/30] => [0.33, 1.0]
+      const scaleFactor = randomAcc / maxBound; // 比例因子
 
-      // 生成完全随机的第 6 至 14 位小数抖动量
       const latJitter = Math.random() * maxJitterDegree * scaleFactor;
       const lonJitter = Math.random() * maxJitterDegree * scaleFactor;
 
@@ -184,7 +199,11 @@ function getActiveLocation() {
       targetLocation.longitude = lonBase + (signLon >= 0 ? lonJitter : -lonJitter);
       targetLocation.accuracy = randomAcc;
 
-      logger.info(`[WLOC] 触发 25m 随机抖动算法：动态精度=${randomAcc}m, 经度=${origLon.toFixed(6)}->${targetLocation.longitude}, 纬度=${origLat.toFixed(6)}->${targetLocation.latitude}`);
+      logger.info(`[WLOC] 触发 [${minBound}:${maxBound}] 范围随机抖动算法：动态精度=${randomAcc}m, 经度=${origLon.toFixed(6)}->${targetLocation.longitude}, 纬度=${origLat.toFixed(6)}->${targetLocation.latitude}`);
+    } else {
+      // 静态固定精度，转换其为整数，不进行抖动修改
+      const accNum = parseInt(targetLocation.accuracy, 10);
+      targetLocation.accuracy = isNaN(accNum) || accNum <= 0 ? 25 : accNum;
     }
   }
 

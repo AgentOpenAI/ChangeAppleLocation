@@ -1,14 +1,14 @@
 #!name=Apple WLOC 定位修改
-#!desc=修改 Apple 网络定位返回坐标 | 快捷指令(推荐): 设置地理位置 https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7 清理恢复位置 https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f
+#!desc=修改 Apple 网络定位返回坐标 | 快捷指令:设置位置 https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7 清理恢复 https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f | 使用方法:选点 -> 储存 -> 开关定位服务或重启生效
 #!icon=https://raw.githubusercontent.com/AgentOpenAI/ChangeAppleLocation/refs/heads/master/wloc.jpg
 #!author=AgentOpenAI
 #!homepage=https://github.com/AgentOpenAI/ChangeAppleLocation
 #!openUrl=https://changeapplelocation.appleai.workers.dev/
 
 [Argument]
-longitude = input, "113.94114", tag=经度(在线选点优先)
-latitude = input, "22.544577", tag=纬度(在线选点优先)
-accuracy = input, "25", tag=精度(米)
+longitude = input, "0", tag=经度(选点储存优先，默认0为透传恢复)
+latitude = input, "0", tag=纬度(选点储存优先，默认0为透传恢复)
+accuracy = input, "25", tag=精度(数字如25；或范围如10:100触发随机抖动)
 logLevel = select, "info", "off", "error", "warn", "debug", "all", tag=日志级别
 
 [Script]
