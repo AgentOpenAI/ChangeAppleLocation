@@ -134,6 +134,36 @@ function getActiveLocation() {
   return activeConfig;
 }
 
+/**
+ * 高精度 13-14 位经纬度小数智能补齐函数
+ * @param {number} val 经度或纬度浮点数
+ * @returns {number}
+ */
+function padTo13Or14Decimals(val) {
+  const str = String(val);
+  const dotIdx = str.indexOf('.');
+  let decimals = 0;
+  if (dotIdx !== -1) {
+    decimals = str.substring(dotIdx + 1).replace(/0+$/, '').length;
+  }
+  if (decimals >= 13) {
+    return val;
+  }
+  const targetDecimals = 13 + Math.floor(Math.random() * 2);
+  const digitsToFill = targetDecimals - decimals;
+  let suffix = '';
+  for (let i = 0; i < digitsToFill; i++) {
+    suffix += Math.floor(Math.random() * 10);
+  }
+  let cleanStr = str;
+  if (dotIdx !== -1) {
+    cleanStr = str.substring(0, dotIdx + 1) + str.substring(dotIdx + 1).replace(/0+$/, '');
+  } else {
+    cleanStr = str + '.';
+  }
+  return parseFloat(cleanStr + suffix);
+}
+
 // 主执行闭环逻辑
 (async () => {
   const requestUrl = typeof $request !== "undefined" ? $request.url : "";
@@ -201,7 +231,9 @@ function getActiveLocation() {
 
       logger.info(`[WLOC] 触发 [${minBound}:${maxBound}] 范围随机抖动算法：动态精度=${randomAcc}m, 经度=${origLon.toFixed(6)}->${targetLocation.longitude}, 纬度=${origLat.toFixed(6)}->${targetLocation.latitude}`);
     } else {
-      // 静态固定精度，转换其为整数，不进行抖动修改
+      // 静态固定精度，转换其为整数，不进行抖动修改。如果精度输入的是固定数字，不满 13 14 位随机补齐，如果满 13 14 位了就不管
+      targetLocation.latitude = padTo13Or14Decimals(targetLocation.latitude);
+      targetLocation.longitude = padTo13Or14Decimals(targetLocation.longitude);
       const accNum = parseInt(targetLocation.accuracy, 10);
       targetLocation.accuracy = isNaN(accNum) || accNum <= 0 ? 25 : accNum;
     }
