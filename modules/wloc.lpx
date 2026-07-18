@@ -8,7 +8,7 @@
 [Argument]
 longitude = input, "0", tag=经度(选点储存优先，默认0为透传恢复)
 latitude = input, "0", tag=纬度(选点储存优先，默认0为透传恢复)
-accuracy = input, "25", tag=精度(米，默认25为随机抖动)
+accuracy = input, "25", tag=精度(数字如25；或范围如10:100触发随机抖动)
 logLevel = select, "info", "off", "error", "warn", "debug", "all", tag=日志级别
 
 [Script]

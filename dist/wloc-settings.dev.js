@@ -449,7 +449,8 @@
     } else {
       const lon = parseFloat(queryParams.get("lon") || queryParams.get("longitude") || "0");
       const lat = parseFloat(queryParams.get("lat") || queryParams.get("latitude") || "0");
-      const acc = parseInt(queryParams.get("acc") || queryParams.get("accuracy") || "25", 10);
+      let acc = queryParams.get("acc") || queryParams.get("accuracy") || "25";
+      acc = String(acc).trim();
       if (lon && lat) {
         const savePayload = {
           longitude: lon,
@@ -466,7 +467,7 @@
               latitude: lat,
               accuracy: acc
             };
-            logger.info(`[Settings] \u5199\u5165\u63A5\u53E3: \u6210\u529F\u5199\u5165\u76EE\u6807\u7ECF\u7EAC\u5EA6 lon=${lon}, lat=${lat}, \u7CBE\u5EA6=${acc}\u7C73.`);
+            logger.info(`[Settings] \u5199\u5165\u63A5\u53E3: \u6210\u529F\u5199\u5165\u76EE\u6807\u7ECF\u7EAC\u5EA6 lon=${lon}, lat=${lat}, \u7CBE\u5EA6=${acc}.`);
           } else {
             responseData = { success: false, error: "\u6301\u4E45\u5316\u5B58\u50A8\u5199\u5165\u52A8\u4F5C\u8FD4\u56DE\u5931\u8D25\u3002" };
             logger.error("[Settings] \u5199\u5165\u6301\u4E45\u5316\u6570\u636E\u5931\u8D25: Storage.setItem \u8FD4\u56DE false");

@@ -5138,14 +5138,14 @@
     const activeConfig = { ...DEFAULT_COORDS };
     if (argConfig.longitude) activeConfig.longitude = parseFloat(argConfig.longitude);
     if (argConfig.latitude) activeConfig.latitude = parseFloat(argConfig.latitude);
-    if (argConfig.accuracy) activeConfig.accuracy = parseInt(argConfig.accuracy, 10);
+    if (argConfig.accuracy) activeConfig.accuracy = isNaN(Number(argConfig.accuracy)) ? String(argConfig.accuracy).trim() : parseInt(argConfig.accuracy, 10);
     if (argConfig.logLevel) activeConfig.logLevel = argConfig.logLevel;
     if (argConfig.LogLevel) activeConfig.logLevel = argConfig.LogLevel;
     if (savedConfig) {
       if (savedConfig.longitude) activeConfig.longitude = parseFloat(savedConfig.longitude);
       if (savedConfig.latitude) activeConfig.latitude = parseFloat(savedConfig.latitude);
-      if (savedConfig.accuracy) activeConfig.accuracy = parseInt(savedConfig.accuracy, 10);
-      logger.info(`[Settings] \u8BFB\u53D6\u5E76\u4F7F\u7528\u5DF2\u4FDD\u5B58\u5750\u6807: lon=${activeConfig.longitude}, lat=${activeConfig.latitude}`);
+      if (savedConfig.accuracy) activeConfig.accuracy = isNaN(Number(savedConfig.accuracy)) ? String(savedConfig.accuracy).trim() : parseInt(savedConfig.accuracy, 10);
+      logger.info(`[Settings] \u8BFB\u53D6\u5E76\u4F7F\u7528\u5DF2\u4FDD\u5B58\u5750\u6807: lon=${activeConfig.longitude}, lat=${activeConfig.latitude}, \u539F\u59CB\u914D\u7F6E\u7CBE\u5EA6=${activeConfig.accuracy}`);
     } else {
       const isDefaultLon = Math.abs(activeConfig.longitude - DEFAULT_COORDS.longitude) < 1e-5;
       const isDefaultLat = Math.abs(activeConfig.latitude - DEFAULT_COORDS.latitude) < 1e-5;
@@ -5166,8 +5166,22 @@
     const targetLocation = getActiveLocation();
     if (targetLocation) {
       logger.setLogLevel(targetLocation.logLevel);
-      if (targetLocation.accuracy === 25) {
-        const randomAcc = Math.floor(Math.random() * 21) + 10;
+      let isRangeRandom = false;
+      let minBound = 10;
+      let maxBound = 100;
+      const accStr = String(targetLocation.accuracy);
+      if (accStr.includes(":")) {
+        const parts = accStr.split(":");
+        const p1 = parseInt(parts[0], 10);
+        const p2 = parseInt(parts[1], 10);
+        if (!isNaN(p1) && !isNaN(p2) && p1 > 0 && p2 > 0) {
+          minBound = Math.min(p1, p2);
+          maxBound = Math.max(p1, p2);
+          isRangeRandom = true;
+        }
+      }
+      if (isRangeRandom) {
+        const randomAcc = Math.floor(Math.random() * (maxBound - minBound + 1)) + minBound;
         const origLat = targetLocation.latitude;
         const origLon = targetLocation.longitude;
         const get5DecBase = (val) => {
@@ -5178,7 +5192,7 @@
         const latBase = get5DecBase(origLat);
         const lonBase = get5DecBase(origLon);
         const maxJitterDegree = 999999999e-14;
-        const scaleFactor = randomAcc / 30;
+        const scaleFactor = randomAcc / maxBound;
         const latJitter = Math.random() * maxJitterDegree * scaleFactor;
         const lonJitter = Math.random() * maxJitterDegree * scaleFactor;
         const signLat = Math.sign(origLat);
@@ -5186,7 +5200,10 @@
         targetLocation.latitude = latBase + (signLat >= 0 ? latJitter : -latJitter);
         targetLocation.longitude = lonBase + (signLon >= 0 ? lonJitter : -lonJitter);
         targetLocation.accuracy = randomAcc;
-        logger.info(`[WLOC] \u89E6\u53D1 25m \u968F\u673A\u6296\u52A8\u7B97\u6CD5\uFF1A\u52A8\u6001\u7CBE\u5EA6=${randomAcc}m, \u7ECF\u5EA6=${origLon.toFixed(6)}->${targetLocation.longitude}, \u7EAC\u5EA6=${origLat.toFixed(6)}->${targetLocation.latitude}`);
+        logger.info(`[WLOC] \u89E6\u53D1 [${minBound}:${maxBound}] \u8303\u56F4\u968F\u673A\u6296\u52A8\u7B97\u6CD5\uFF1A\u52A8\u6001\u7CBE\u5EA6=${randomAcc}m, \u7ECF\u5EA6=${origLon.toFixed(6)}->${targetLocation.longitude}, \u7EAC\u5EA6=${origLat.toFixed(6)}->${targetLocation.latitude}`);
+      } else {
+        const accNum = parseInt(targetLocation.accuracy, 10);
+        targetLocation.accuracy = isNaN(accNum) || accNum <= 0 ? 25 : accNum;
       }
     }
     logger.group(`WLOC \u5B9A\u4F4D\u4FEE\u6539\u670D\u52A1 - ${requestUrl}`);

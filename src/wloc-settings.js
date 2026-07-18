@@ -96,7 +96,9 @@ function getQueryParams(url) {
     // 路由 3: 默认的 save 命令，写入并保存前端选点页面传过来的坐标
     const lon = parseFloat(queryParams.get("lon") || queryParams.get("longitude") || "0");
     const lat = parseFloat(queryParams.get("lat") || queryParams.get("latitude") || "0");
-    const acc = parseInt(queryParams.get("acc") || queryParams.get("accuracy") || "25", 10);
+    let acc = queryParams.get("acc") || queryParams.get("accuracy") || "25";
+    // 过滤可能包含的额外多余空格
+    acc = String(acc).trim();
 
     if (lon && lat) {
       // 构造存储实体，附加时区更新戳 (北京时间 UTC+8)
@@ -116,7 +118,7 @@ function getQueryParams(url) {
             latitude: lat,
             accuracy: acc
           };
-          logger.info(`[Settings] 写入接口: 成功写入目标经纬度 lon=${lon}, lat=${lat}, 精度=${acc}米.`);
+          logger.info(`[Settings] 写入接口: 成功写入目标经纬度 lon=${lon}, lat=${lat}, 精度=${acc}.`);
         } else {
           responseData = { success: false, error: "持久化存储写入动作返回失败。" };
           logger.error("[Settings] 写入持久化数据失败: Storage.setItem 返回 false");
